@@ -1,4 +1,4 @@
-# Elden Ring Merchant Mod
+# Elden Ring Quest Log
 
 A mod for Elden Ring that allows to check on the progress for all quests done so far.
 
