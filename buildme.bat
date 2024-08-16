@@ -1,1 +1,1 @@
-msbuild.exe build\EldenRingMerchantMod.vcxproj
+msbuild.exe build\EldenRingQuestLogMod.vcxproj
