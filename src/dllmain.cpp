@@ -2,6 +2,7 @@
 #include <filesystem>
 #include <memory>
 #include <spdlog/sinks/daily_file_sink.h>
+#include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 #include <thread>
@@ -9,7 +10,7 @@
 
 #include "erquestlog_config.hpp"
 #include "erquestlog_messages.hpp"
-//#include "erquestlog_shops.hpp"
+#include "erquestlog_shops.hpp"
 #include "erquestlog_talkscript.hpp"
 #include "from/params.hpp"
 #include "modutils.hpp"
@@ -18,7 +19,7 @@ static std::thread mod_thread;
 
 static void setup_logger(std::filesystem::path log_file)
 {
-    auto logger = std::make_shared<spdlog::logger>("merchant");
+    auto logger = std::make_shared<spdlog::logger>("questlog");
     logger->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%n] %^[%l]%$ %v");
     logger->sinks().push_back(
         std::make_shared<spdlog::sinks::daily_file_sink_st>(log_file.string(), 0, 0, false, 5));
@@ -48,8 +49,8 @@ static void setup_mod()
     spdlog::info("Hooking messages...");
     erquestlog::setup_messages();
 
-    /*spdlog::info("Hooking shops...");
-    erquestlog::setup_shops();*/
+    //spdlog::info("Hooking shops...");
+    erquestlog::setup_shops();
 
     spdlog::info("Hooking talkscripts...");
     erquestlog::setup_talkscript();
@@ -69,7 +70,7 @@ bool WINAPI DllMain(HINSTANCE dll_instance, unsigned int fdw_reason, void *lpv_r
         setup_logger(folder / "logs" / "erquestlog.log");
 
 #ifdef PROJECT_VERSION
-        spdlog::info("Glorious Merchant version {}", PROJECT_VERSION);
+        spdlog::info("Quest Log version {}", PROJECT_VERSION);
 #endif
 
         erquestlog::load_config(folder / "erquestlog.ini");
