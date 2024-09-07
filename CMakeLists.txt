@@ -60,17 +60,15 @@ add_library(EldenRingQuestLogMod SHARED
   src/from/params.cpp
   src/modutils.hpp
   src/modutils.cpp
-  src/gamestrings.cpp
   src/erquestlog_config.hpp
   src/erquestlog_config.cpp
+  src/erquestlog_evaluators.cpp
   src/erquestlog_talkscript.hpp
   src/erquestlog_talkscript.cpp
   src/erquestlog_talkscript_utils.hpp
-  src/erquestlog_shops.hpp
-  src/erquestlog_shops.cpp
+  src/erquestlog_quests.hpp
   src/erquestlog_messages.hpp
   src/erquestlog_messages.cpp
-  src/erquestlog_messages_by_lang.cpp
   src/dllmain.cpp)
 
 set_target_properties(EldenRingQuestLogMod PROPERTIES OUTPUT_NAME "erquestlog")
@@ -84,6 +82,11 @@ add_custom_command(TARGET EldenRingQuestLogMod POST_BUILD
   ${CMAKE_SOURCE_DIR}/LICENSE.txt
   ${CMAKE_SOURCE_DIR}/erquestlog.ini
   COMMAND_EXPAND_LISTS)
+
+add_custom_command(TARGET EldenRingQuestLogMod POST_BUILD
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+  ${CMAKE_SOURCE_DIR}/questlog_lang
+  $<TARGET_FILE_DIR:EldenRingQuestLogMod>/questlog_lang)
 
 target_link_libraries(EldenRingQuestLogMod
   minhook
