@@ -10,7 +10,6 @@
 
 #include "erquestlog_config.hpp"
 #include "erquestlog_messages.hpp"
-#include "erquestlog_shops.hpp"
 #include "erquestlog_talkscript.hpp"
 #include "from/params.hpp"
 #include "modutils.hpp"
@@ -25,7 +24,7 @@ static void setup_logger(std::filesystem::path log_file)
         std::make_shared<spdlog::sinks::daily_file_sink_st>(log_file.string(), 0, 0, false, 5));
     logger->flush_on(spdlog::level::info);
 
-#if _DEBUG
+/*#if _DEBUG
     AllocConsole();
     FILE *stream;
     freopen_s(&stream, "CONOUT$", "w", stdout);
@@ -33,12 +32,12 @@ static void setup_logger(std::filesystem::path log_file)
     freopen_s(&stream, "CONIN$", "r", stdin);
     logger->sinks().push_back(std::make_shared<spdlog::sinks::stdout_color_sink_st>());
     logger->set_level(spdlog::level::trace);
-#endif
+#endif*/
 
     spdlog::set_default_logger(logger);
 }
 
-static void setup_mod()
+static void setup_mod(std::filesystem::path folder)
 {
     modutils::initialize();
     from::params::initialize();
@@ -46,11 +45,8 @@ static void setup_mod()
     spdlog::info("Sleeping an extra 10s to work potential compatibility issues...");
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    spdlog::info("Hooking messages...");
-    erquestlog::setup_messages();
-
-    //spdlog::info("Hooking shops...");
-    erquestlog::setup_shops();
+    spdlog::info("Hooking messages and importing text...");
+    erquestlog::setup_messages(folder);
 
     spdlog::info("Hooking talkscripts...");
     erquestlog::setup_talkscript();
@@ -69,16 +65,16 @@ bool WINAPI DllMain(HINSTANCE dll_instance, unsigned int fdw_reason, void *lpv_r
 
         setup_logger(folder / "logs" / "erquestlog.log");
 
-#ifdef PROJECT_VERSION
-        spdlog::info("Quest Log version {}", PROJECT_VERSION);
-#endif
+        #ifdef PROJECT_VERSION
+            spdlog::info("Quest Log version {}", PROJECT_VERSION);
+        #endif
 
         erquestlog::load_config(folder / "erquestlog.ini");
 
-        mod_thread = std::thread([]() {
+        mod_thread = std::thread([folder]() {
             try
             {
-                setup_mod();
+                setup_mod(folder);
             }
             catch (std::runtime_error const &e)
             {

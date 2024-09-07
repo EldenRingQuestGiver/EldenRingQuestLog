@@ -1,180 +1,133 @@
 /**
  * erquestlog_talkscript.cpp
  *
- * Talkscript patching hook. This intercepts the start of Kalé's dialogue tree, and patches it to
- * include more options for modded shops.
+ * Talkscript patching hook. This inserts the questlog menu in the grace dialogue menu
  */
 #include "erquestlog_talkscript.hpp"
-#include "gamestrings.cpp"
 
-#include <algorithm>
 #include <array>
 #include <span>
 #include <spdlog/spdlog.h>
 
-#include "erquestlog_messages.hpp"
-#include "erquestlog_shops.hpp"
-#include "erquestlog_talkscript_utils.hpp"
-#include "from/ezstate.hpp"
-#include "from/talk_commands.hpp"
+#include "erquestlog_quests.hpp"
 #include "modutils.hpp"
 
 static constexpr unsigned char get_talk_list_entry_result_function = 23;
 
 static std::array<from::EzState::transition *, 100> patched_transition_array;
-
 static std::array<from::EzState::event, 100> patched_events;
 static std::array<from::EzState::transition *, 100> patched_transitions;
 static std::array<from::EzState::transition *, 100> test_tr;
 
-unsigned char tr;
+static bool is_sort_chest_transition(const from::EzState::transition *transition)
+{
+    auto target_state = transition->target_state;
+    return target_state != nullptr && !target_state->entry_events.empty() &&
+           target_state->entry_events[0].command == from::talk_command::open_repository;
+}
+
+std::string to_hex_string(std::span<const unsigned char> data) {
+    std::stringstream ss;
+    ss << std::hex << std::setfill('0');
+    for (unsigned char byte : data) {
+        if (ss.tellp() > 0) ss << "\\x";  // Add space between bytes
+        ss << std::setw(2) << static_cast<int>(byte);
+    }
+    return "\\x" + ss.str();
+}
 
 /**
- * Check if the given state group is the main menu for a merchant, and patch it to contain the
+ * Check if the given state group is the main menu for the grace, and patch it to contain the
  * modded menu options
  */
 static bool patch_states(from::EzState::state_group *state_group)
 {
     from::EzState::state *add_menu_state = nullptr;
-    from::EzState::event *add_menu_event = nullptr;
-    from::EzState::event *add_menu1_event = nullptr;
     from::EzState::state *menu_transition_state = nullptr;
 
-    bool bani = false;
+    int event_index = -1;
+    int transition_index = -1;
 
     for (auto &state : state_group->states)
     {
-        if(0x7fffffff - state_group->id == 31 ||
-            0x7fffffff - state_group->id == 33)
+        for (int i = 0; i < state.entry_events.size(); i++)
         {
-            for (auto &event : state.entry_events)
-            {
-                spdlog::debug("Event id: {0}, bank: {1}", 
-                                event.command.id,
-                                event.command.bank
-                            );
-                
-                if (event.command == from::talk_command::add_talk_list_data ||
-                    event.command == from::talk_command::add_talk_list_data_if
-                )
-                {
-                    
-                    if (event.command == from::talk_command::add_talk_list_data)
-                    {
-                        spdlog::debug("Event add_talk_list_data: state group {0}, index {1}, message {2}",
-                                    0x7fffffff - state_group->id, 
-                                    get_int_value(event.args[0]),
-                                    get_int_value(event.args[1]) //strees.at(get_int_value(event.args[1]))
-                                );
-                    } else {
-                        spdlog::debug("Event add_talk_list_data_if: state group {0}, index {1}, message {2}",
-                                    0x7fffffff - state_group->id, 
-                                    get_int_value(event.args[1]),
-                                    get_int_value(event.args[2]) //strees.at(get_int_value(event.args[1]))
-                                );
-                    }
+            auto &event = state.entry_events[i];
 
-                    auto message_id = get_int_value(event.args[1]);
-                    if (message_id == erquestlog::event_text_for_talk::sortchest)
-                    {
-                        add_menu_event = &event;
-                        add_menu_state = &state;
-                    }
-                    else if (message_id == erquestlog::event_text_for_talk::quest_log)
-                    {
-                        spdlog::debug("Not patching state group x{}, already patched",
-                                    0x7fffffff - state_group->id);
-                        bani=true;
-                        //return true;
-                    }
+            /*spdlog::debug("Event id: {0}, bank: {1}", 
+                    event.command.id,
+                    event.command.bank
+                );*/
+
+            if (event.command == from::talk_command::add_talk_list_data)
+            {
+                auto message_id = get_int_value(event.args[1]);
+                if (message_id == 15000395)         // Sort chest
+                {
+                    add_menu_state = &state;
+                    event_index = i;
+                }
+                else if (message_id == 82000000)    // Quest Log
+                {
+                    spdlog::debug("Not patching state group x{}, already patched",
+                                  0x7fffffff - state_group->id);
+                    return true;
                 }
             }
+        }
 
-            // Look for the state where we check the chosen menu item and transition to a new state.
-            for (auto &transition : state.transitions)
-            {   
-                spdlog::debug("Parsing state group x{0}, evaluator.size: {1}, evaluator (pure): {2}",
-                                        0x7fffffff - state_group->id, 
-                                        transition->evaluator.size(), 
-                                        transition->evaluator[0]
-                                    );
+        // Look for the state where we check the chosen menu item and transition to a new state.
+        for (int i = 0; i < state.transitions.size(); i++)
+        {
+            auto &transition = state.transitions[i];
+            if (is_sort_chest_transition(transition))
+            {
+                menu_transition_state = &state;
+                transition_index = i;
 
-                if (transition->evaluator.size() > 1 &&
-                    transition->evaluator[0] - 64 == get_talk_list_entry_result_function)
+                /*for (auto &tr : menu_transition_state->transitions)
                 {
-                    spdlog::debug("Found evaluator!");
-                    spdlog::debug("Transition target state: {}", //, pass_events.command: , pass_events.msg: ", 
-                                        /*0x7fffffff - state_group->id, 
-                                        transition->evaluator.size(), 
-                                        transition->evaluator[0],*/
-                                        transition->target_state->id
-                                        //transition->pass_events[0].command.id,
-                                        //get_int_value(transition->pass_events[0].args[1])
-                                    );
-
-                    menu_transition_state = &state;
-                    break;
-                }
+                    spdlog::debug("Identikit saved transitions [0]: x{0}, evaluator: {1}",
+                            tr->target_state->id, 
+                            to_hex_string(tr->evaluator)
+                        );
+                }*/
             }
         }
     }
 
-
-    if (!add_menu_event || !menu_transition_state || bani)
+    if (event_index == -1 || transition_index == -1)
     {
         return false;
     }
-
     spdlog::info("Patching state group x{}", 0x7fffffff - state_group->id);
 
-    // Change the "Purchase"/"Sell" menu options to "Browse Inventory"/"Browse Cut Content"
-    /*add_menu1_event->args[0] = browse_inventory_index_value;
-    add_menu1_event->args[1] = browse_inventory_message_id_value;*/
-
+    // Add "Ongoing Quests" menu option
     auto &events = add_menu_state->entry_events;
 
     std::copy(events.begin(), events.end(), patched_events.begin());
-    auto new_ev_size = events.size() + 1;
-    //patched_events[new_ev_size] = &browse_inventory_event;
-    patched_events[new_ev_size - 1] = quest_log;
+    patched_events[events.size()] = quest_log;
 
-    spdlog::debug("new_ev_size: {}", new_ev_size);
+    events = {patched_events.data(), events.size() + 1};
 
-    events = {patched_events.data(), new_ev_size};
-
-    /*std::copy(transitions.begin(), transitions.end(), patched_transitions.begin());
-    auto new_tr_size = transitions.size() + 1;
-    patched_transitions[new_tr_size - 1] = &quest_log_transition;
-
-    spdlog::debug("new_tr_size: {}", new_tr_size);
-
-    transitions = {patched_transitions.data(), new_tr_size};*/
-
-    // Add transitions to handle the new menu options.
-    auto &transitions = menu_transition_state->transitions;
-    auto &tr = transitions[0]->sub_transitions;
-
-    spdlog::debug("Identikit saved transitions [0]: x{0}, evaluator.size: {1}, evaluator (pure): {2}",
-                                        0x7fffffff - state_group->id, 
-                                        transitions[0]->evaluator.size(), 
-                                        transitions[0]->evaluator[0]
-                                    );
-
-    spdlog::debug("Identikit saved transitions [1]: x{0}, evaluator.size: {1}, evaluator (pure): {2}",
-                                        0x7fffffff - state_group->id, 
-                                        transitions[1]->evaluator.size(), 
-                                        transitions[1]->evaluator[0]
-                                    );
-
-    spdlog::debug("Stats tr: size {0}", tr.size());
+    // Add a transition to the "Ongoing Quests" menu
+    auto &tr = menu_transition_state->transitions;
     
-    std::copy(tr.begin(), tr.end(), patched_transitions.begin());
-    auto new_tr_size = tr.size() + 1;
-    patched_transitions[new_tr_size - 1] = &quest_log_transition;
+    std::copy(tr.begin(), tr.begin() + transition_index, patched_transitions.begin());
+    std::copy(tr.begin() + transition_index, tr.end(),
+              patched_transitions.begin() + transition_index + 1);
+    patched_transitions[transition_index] = &quest_log_transition;
 
-    spdlog::debug("new_tr_size: {}", new_tr_size);
-
-    tr = {patched_transitions.data(), new_tr_size};
+    tr = {patched_transitions.data(), tr.size() + 1};
+    
+    /*spdlog::debug("AFTER PATCH:");
+    for (auto &t : tr)
+    {
+        spdlog::debug("Identikit transition: x{0}, evaluator: {1}",
+                t->target_state->id, 
+                to_hex_string(t->evaluator)
+            );
+    }*/
 
     return true;
 }
@@ -184,8 +137,6 @@ static void (*ezstate_enter_state)(from::EzState::state *,
 
 /**
  * Hook for EzState::state::Enter()
- *
- * Patches merchant dialogue trees to open the shops added by this mod
  */
 static void ezstate_enter_state_detour(from::EzState::state *state,
                                        from::EzState::detail::EzStateMachineImpl *machine,

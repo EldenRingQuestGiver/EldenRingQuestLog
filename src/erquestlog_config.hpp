@@ -12,9 +12,9 @@ void load_config(const std::filesystem::path &ini_path);
 namespace config
 {
 /**
- * Automatically sell weapons upgraded to the highest level you've gotten on a given character
+ * Detects overriding language to use for the mod
  */
-extern bool auto_upgrade_weapons;
+extern std::string lang;
 
 };
 };

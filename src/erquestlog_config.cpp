@@ -2,8 +2,9 @@
 
 #include <mini/ini.h>
 #include <spdlog/spdlog.h>
+#include <string.h>
 
-extern bool erquestlog::config::auto_upgrade_weapons = true;
+extern std::string erquestlog::config::lang = "none";
 
 void erquestlog::load_config(const std::filesystem::path &ini_path)
 {
@@ -15,9 +16,9 @@ void erquestlog::load_config(const std::filesystem::path &ini_path)
     {
         auto &config = ini["erquestlog"];
 
-        if (config.has("auto_upgrade_weapons"))
-            config::auto_upgrade_weapons = config["auto_upgrade_weapons"] != "false";
+        if (config.has("lang"))
+            config::lang = config["lang"];
 
-        spdlog::info("auto_upgrade_weapons = {}", config::auto_upgrade_weapons);
+        spdlog::info("Overriding language = {}", config::lang);
     }
 }

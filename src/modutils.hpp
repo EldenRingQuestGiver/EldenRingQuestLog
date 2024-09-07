@@ -3,10 +3,11 @@
 
 #include <stdexcept>
 #include <vector>
+#include <filesystem>
 
 namespace modutils
 {
-
+    
 void initialize();
 void enable_hooks();
 void deinitialize();

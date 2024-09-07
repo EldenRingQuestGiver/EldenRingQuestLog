@@ -5,15 +5,24 @@
  * function to return them.
  */
 #include "erquestlog_messages.hpp"
+#include "erquestlog_config.hpp"
+#include "erquestlog_talkscript_utils.hpp"
 
 #include <chrono>
 #include <map>
 #include <spdlog/spdlog.h>
 #include <string>
+#include <codecvt>
+#include <locale>
 #include <thread>
 
 #include "from/messages.hpp"
 #include "modutils.hpp"
+
+#include <iostream>
+#include <fstream>
+#include <filesystem>
+#include <stdio.h>
 
 struct ISteamApps;
 extern "C" __declspec(dllimport) ISteamApps *__cdecl SteamAPI_SteamApps_v008();
@@ -32,18 +41,20 @@ static std::string get_steam_language()
     return steam_language != nullptr ? steam_language : "";
 }
 
-static const std::map<int, const std::wstring> *mod_event_text_for_talk;
+std::map<std::string, std::wstring> questlog_strings;
 
 static from::CS::MsgRepositoryImp *msg_repository = nullptr;
 
 static const wchar_t *(*msg_repository_lookup_entry)(from::CS::MsgRepositoryImp *, unsigned int,
                                                      from::msgbnd, int);
 
+std::string wstringToString(const std::wstring& wstr) {
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> converter;
+    return converter.to_bytes(wstr);
+}
+
 /**
  * Hook for MsgRepositoryImp::LookupEntry()
- *
- * Return menu text for the talkscript to open various shops added by the mod, or fall back to
- * the default vanilla messages.
  */
 static const wchar_t *msg_repository_lookup_entry_detour(from::CS::MsgRepositoryImp *msg_repository,
                                                          unsigned int unknown, from::msgbnd bnd_id,
@@ -51,31 +62,95 @@ static const wchar_t *msg_repository_lookup_entry_detour(from::CS::MsgRepository
 {
     if (bnd_id == from::msgbnd::event_text_for_talk)
     {
-        auto result = mod_event_text_for_talk->find(msg_id);
-        if (result != mod_event_text_for_talk->end())
+        auto result = questlog_strings.find(std::to_string(msg_id));
+        if (result != questlog_strings.end())
         {
-            return result->second.c_str();
+            return questlog_strings[std::to_string(msg_id)].c_str();
         }
     }
 
     return msg_repository_lookup_entry(msg_repository, unknown, bnd_id, msg_id);
 }
 
-void erquestlog::setup_messages()
+/**
+* Read lines from a language file and populates a corresponding map
+*/
+std::map<std::string, std::wstring> readFileToMap(std::filesystem::path folder, std::string lang) {
+    std::map<std::string, std::wstring> dataMap;
+
+    std::string path = (folder / "questlog_lang" / (lang + ".lang")).string();
+    std::string default_path = (folder / "questlog_lang" / "english.lang").string();
+
+    std::wifstream file(path);
+    std::wifstream default_file(default_path);
+    std::wstring line;
+
+    if (!file.is_open()) {
+        spdlog::warn("Language \"{}\" not found, using english...", lang);
+        file.close();
+        file.open(default_path);
+
+        if (!file.is_open()) {
+            spdlog::warn("Error opening default english version.");
+            return dataMap;
+        }
+    }
+
+    while (std::getline(file, line)) {
+        size_t colonPos = line.find(':');
+        if (colonPos != std::string::npos) {
+            std::string key = wstringToString(line.substr(1, colonPos - 2)); // Remove quotes
+            std::wstring value = line.substr(colonPos + 3, line.length() - colonPos - 4); // Remove quotes and space
+            //spdlog::info("Found value \"{1}\" for key \"{0}\"", key, wstringToString(value));
+            dataMap[key] = value;
+        }
+    }
+
+    file.close();
+    return dataMap;
+}
+
+void erquestlog::setup_messages(std::filesystem::path folder)
 {
     // Pick the messages to use based on the player's selected language for the game in Steam
     auto language = get_steam_language();
-    auto localized_messages = event_text_for_talk_by_lang.find(language);
-    if (localized_messages != event_text_for_talk_by_lang.end())
+
+    if(config::lang != "none")
     {
-        spdlog::info("Detected language \"{}\"", language);
-        mod_event_text_for_talk = &localized_messages->second;
+        language = config::lang;
     }
-    else
-    {
-        spdlog::warn("Unknown language \"{}\", defaulting to English", language);
-        mod_event_text_for_talk = &event_text_for_talk_by_lang.at("english");
+    
+    questlog_strings = readFileToMap(folder, language);
+
+    //spdlog::info("Checking string 82350900: \"{}\"", wstringToString(questlog_strings["82350900"]));
+    
+    /*auto bani = esd_get_flag_value(1044399206, 9, 1);
+    spdlog::info("esd_get_flag_value:");
+
+    for(unsigned char b : bani){
+        spdlog::info("{}", b+0);
+        if(b==0xa1) break;
     }
+    auto bani2 = esd_get_flag(4700);
+    spdlog::info("esd_get_flag:");
+
+    for(unsigned char b : bani2){
+        spdlog::info("{}", b+0);
+        if(b==0xa1) break;
+    }
+
+    auto bani3 = esd_and(esd_get_flag(4700), esd_compare_inventory(2962, 1));
+    spdlog::info("esd_and:");
+
+    for(unsigned char b : bani3){
+        spdlog::info("{}", b+0);
+        if(b==0xa1) break;
+    }
+
+    /*spdlog::info("Check esd_get_talk_list: {}",
+            esd_get_talk_list(1).data
+        );*/
+        
 
     auto msg_repository_address = modutils::scan<from::CS::MsgRepositoryImp *>({
         .aob = "48 8B 3D ?? ?? ?? ?? 44 0F B6 30 48 85 FF 75",
