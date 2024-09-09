@@ -2,7 +2,6 @@
 
 #include <mini/ini.h>
 #include <spdlog/spdlog.h>
-#include <string.h>
 
 extern std::string erquestlog::config::lang = "none";
 

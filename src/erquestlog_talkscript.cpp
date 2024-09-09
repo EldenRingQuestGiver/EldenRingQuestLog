@@ -64,10 +64,11 @@ static bool patch_states(from::EzState::state_group *state_group)
                 auto message_id = get_int_value(event.args[1]);
                 if (message_id == 15000395)         // Sort chest
                 {
+                    spdlog::info("Found sort chest message...");
                     add_menu_state = &state;
                     event_index = i;
                 }
-                else if (message_id == 82000000)    // Quest Log
+                else if (message_id == 87000000)    // Quest Log
                 {
                     spdlog::debug("Not patching state group x{}, already patched",
                                   0x7fffffff - state_group->id);
@@ -82,6 +83,7 @@ static bool patch_states(from::EzState::state_group *state_group)
             auto &transition = state.transitions[i];
             if (is_sort_chest_transition(transition))
             {
+                spdlog::info("Found transition state, id: {}...", 0x7fffffff - state_group->id);
                 menu_transition_state = &state;
                 transition_index = i;
 

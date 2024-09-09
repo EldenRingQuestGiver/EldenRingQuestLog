@@ -174,7 +174,7 @@ constexpr esd_expression esd_compare_inventory(int item_flag, int value = 0, int
     };
 }
 
-/*constexpr std::array<unsigned char, 10> esd_get_talk_list(int pos)
+/*constexpr std::string esd_get_talk_list(int pos)
 {
     return {
         0x57,

@@ -19,10 +19,8 @@
 #include "from/messages.hpp"
 #include "modutils.hpp"
 
-#include <iostream>
 #include <fstream>
 #include <filesystem>
-#include <stdio.h>
 
 struct ISteamApps;
 extern "C" __declspec(dllimport) ISteamApps *__cdecl SteamAPI_SteamApps_v008();
@@ -65,11 +63,23 @@ static const wchar_t *msg_repository_lookup_entry_detour(from::CS::MsgRepository
         auto result = questlog_strings.find(std::to_string(msg_id));
         if (result != questlog_strings.end())
         {
-            return questlog_strings[std::to_string(msg_id)].c_str();
+            //return questlog_strings[std::to_string(msg_id)].c_str();
+            return result->second.data();
+            //return L"test\ntest&egrave;ù";
         }
     }
 
     return msg_repository_lookup_entry(msg_repository, unknown, bnd_id, msg_id);
+}
+
+// Replace any substring
+std::string ReplaceAll(std::string str, const std::string& from, const std::string& to) {
+    size_t start_pos = 0;
+    while((start_pos = str.find(from, start_pos)) != std::string::npos) {
+        str.replace(start_pos, from.length(), to);
+        start_pos += to.length(); // Handles case where 'to' is a substring of 'from'
+    }
+    return str;
 }
 
 /**
@@ -81,9 +91,8 @@ std::map<std::string, std::wstring> readFileToMap(std::filesystem::path folder, 
     std::string path = (folder / "questlog_lang" / (lang + ".lang")).string();
     std::string default_path = (folder / "questlog_lang" / "english.lang").string();
 
-    std::wifstream file(path);
-    std::wifstream default_file(default_path);
-    std::wstring line;
+    std::ifstream file(path);
+    //std::wifstream file(path);
 
     if (!file.is_open()) {
         spdlog::warn("Language \"{}\" not found, using english...", lang);
@@ -96,13 +105,22 @@ std::map<std::string, std::wstring> readFileToMap(std::filesystem::path folder, 
         }
     }
 
+    //std::wstring line;
+    std::string line;
+
+    std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> converter;
+
     while (std::getline(file, line)) {
         size_t colonPos = line.find(':');
         if (colonPos != std::string::npos) {
-            std::string key = wstringToString(line.substr(1, colonPos - 2)); // Remove quotes
+            /*std::string key = wstringToString(line.substr(1, colonPos - 2)); // Remove quotes
             std::wstring value = line.substr(colonPos + 3, line.length() - colonPos - 4); // Remove quotes and space
+            dataMap[key] = value;*/
+            std::string key = line.substr(1, colonPos - 2); // Remove quotes
+            std::string value = line.substr(colonPos + 3, line.length() - colonPos - 4); // Remove quotes and space
+            value = ReplaceAll(value, "\\n", "\n");
+            dataMap[key] = converter.from_bytes(value);
             //spdlog::info("Found value \"{1}\" for key \"{0}\"", key, wstringToString(value));
-            dataMap[key] = value;
         }
     }
 
