@@ -4,23 +4,22 @@
  * New messages. This determines the message strings uses by the mod, and hooks the message lookup
  * function to return them.
  */
-#include "erquestlog_messages.hpp"
+//#include "erquestlog_messages.hpp"
 #include "erquestlog_config.hpp"
 #include "erquestlog_talkscript_utils.hpp"
-
-#include <chrono>
-#include <map>
-#include <spdlog/spdlog.h>
-#include <string>
-#include <codecvt>
-#include <locale>
-#include <thread>
 
 #include "from/messages.hpp"
 #include "modutils.hpp"
 
+#include <spdlog/spdlog.h>
 #include <fstream>
-#include <filesystem>
+#include <codecvt>
+#include <locale>
+
+/*#include <chrono>
+#include <map>*/
+//#include <thread>
+//#include <filesystem>
 
 struct ISteamApps;
 extern "C" __declspec(dllimport) ISteamApps *__cdecl SteamAPI_SteamApps_v008();

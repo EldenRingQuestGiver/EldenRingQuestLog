@@ -1,10 +1,9 @@
 #define WIN32_LEAN_AND_MEAN
-#include <filesystem>
-#include <memory>
+
 #include <spdlog/sinks/daily_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
-#include <thread>
+
 #include <windows.h>
 
 #include "erquestlog_config.hpp"

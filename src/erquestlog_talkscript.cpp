@@ -5,8 +5,6 @@
  */
 #include "erquestlog_talkscript.hpp"
 
-#include <array>
-#include <span>
 #include <spdlog/spdlog.h>
 
 #include "erquestlog_quests.hpp"

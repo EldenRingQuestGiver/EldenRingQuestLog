@@ -1,16 +1,10 @@
 #include <codecvt>
-#include <filesystem>
-#include <locale>
 #include <span>
-#include <stdexcept>
-#include <string>
 
 #include <MinHook.h>
 #include <Pattern16.h>
 #include <spdlog/spdlog.h>
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <winver.h>
 
 #include "modutils.hpp"
 

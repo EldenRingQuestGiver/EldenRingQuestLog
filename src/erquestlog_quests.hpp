@@ -2,7 +2,6 @@
 /**
  * Quest definitions
  */
-#include <array>
 
 #include "erquestlog_talkscript_utils.hpp"
 
